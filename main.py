@@ -1,4 +1,3 @@
-
 import struct
 import pyaudio
 import pvporcupine
@@ -9,6 +8,13 @@ import google.generativeai as genai
 import os
 import pyttsx3
 from dotenv import load_dotenv
+import multiprocessing
+from IPython.display import Markdown
+import textwrap
+import markdown
+from bs4 import BeautifulSoup
+from AppOpener import open as Open,close as Close
+import webbrowser
 load_dotenv()
 porcupine=None
 paud=None
@@ -32,41 +38,114 @@ def speak(text):
     print("Jarvis:",text)
     engine.say(text)
     engine.runAndWait()
+    
+def to_text(text):
+    text = text.replace('•', '  *')
+    md = Markdown(textwrap.indent(text, '> ', predicate=lambda _: True))
+    html_text = markdown.markdown(md.data)
+    text = "".join(BeautifulSoup(html_text,"html.parser").findAll(text=True))
+    return text
+
 model = genai.GenerativeModel('gemini-pro')
 chat = model.start_chat(history=[])
-try:
-    print(pvporcupine.KEYWORDS)
-    porcupine=pvporcupine.create(keywords=["jarvis"]) #pvporcupine.KEYWORDS for all keywords
-    paud=pyaudio.PyAudio()
-    audio_stream=paud.open(rate=porcupine.sample_rate,channels=1,format=pyaudio.paInt16,input=True,frames_per_buffer=porcupine.frame_length)
-    while True:
-        keyword=audio_stream.read(porcupine.frame_length)
-        keyword=struct.unpack_from("h"*porcupine.frame_length,keyword)
-        keyword_index=porcupine.process(keyword)
-        if keyword_index>=0:
-            print("hotword detected")
-            startsound()
-            recognize=sr.Recognizer()
-            with sr.Microphone() as source:
-                audio=recognize.listen(source)
-                endsound()
-            try:
-                query=recognize.recognize_google(audio,language='en-in')
-                print(query)
-                query = str(query).lower()
-                if query != " " and query != "":
-                    response = chat.send_message(query)
-                    # print(response.text)
-                    speak(response.text)
-                    
-            except Exception as e:
-                pass
-                # speak("not recognize")
+if not os.path.exists('chose.txt'):
+    f = open("chose.txt", 'w')
+    f.write('0')
+    f.close()
 
-finally:
-    if porcupine is not None:
-        porcupine.delete()
-    if audio_stream is not None:
-        audio_stream.close()
-    if paud is not None:
-        paud.terminate()
+
+
+def jarvis_brain(text):
+    q = text.split(" ")
+    if q[0] == "open":
+        if text=='open youtube':
+                    webbrowser.open("https://www.youtube.com/")
+                    speak("opening youtube")
+        else:
+            Open(" ".join(q[1::]),match_closest=True)
+            speak(f'opening {" ".join(q[1::])}')
+    elif q[0] == "close":
+        Close(" ".join(q[1::]),match_closest=True)
+        speak(f'closing {" ".join(q[1::])}')
+    elif text=='play music':
+            file=open("chose.txt",'r')
+            chose=file.readlines()
+            chose=int(chose[0])
+            m='e:\\songs'
+            song=os.listdir(m)
+            length=len(song)
+            speak("now music is playing")
+            os.startfile(os.path.join(m,song[chose]))
+            chose+=1
+            file = open("chose.txt",'w')
+            file.write(str(chose))
+            file.close()
+    elif text=='next':
+            file=open("chose.txt",'r')
+            chose=file.readlines()
+            chose=int(chose[0])
+            m='e:\\songs'
+            song=os.listdir(m)
+            length=len(song)
+            if chose>=length:
+                speak("no more music to next")
+                speak("i'm playing music from starting")
+                chose=0
+                os.startfile(os.path.join(m,song[chose]))
+            else:
+                os.startfile(os.path.join(m,song[chose]))
+                chose+=1
+            file = open("chose.txt",'w')
+            file.write(str(chose))
+            file.close()
+    elif text=='stop music':
+            speak('ok boss')
+            # Close("Media Player",match_closest=True)
+            speak("now i stop music")
+            # os.system('taskkill /F /FI "WINDOWTITLE eq Movies & Tv" ')
+            os.system('taskkill /F /FI "WINDOWTITLE eq Media Player" ')
+            
+    else:
+        response = chat.send_message(text)
+        speak(to_text(response.text))
+
+
+if __name__ == "__main__":
+    try:
+        cp = None
+        print(pvporcupine.KEYWORDS)
+        porcupine=pvporcupine.create(keywords=["jarvis"]) #pvporcupine.KEYWORDS for all keywords
+        paud=pyaudio.PyAudio()
+        audio_stream=paud.open(rate=porcupine.sample_rate,channels=1,format=pyaudio.paInt16,input=True,frames_per_buffer=porcupine.frame_length)
+        while True:
+            keyword=audio_stream.read(porcupine.frame_length)
+            keyword=struct.unpack_from("h"*porcupine.frame_length,keyword)
+            keyword_index=porcupine.process(keyword)
+            if keyword_index>=0:
+                print("hotword detected")
+                startsound()
+                if cp:
+                    cp.kill()
+                recognize=sr.Recognizer()
+                with sr.Microphone() as source:
+                    audio=recognize.listen(source)
+                    endsound()
+                try:
+                    query=recognize.recognize_google(audio,language='en-in')
+                    print(query)
+                    query = str(query).lower()
+                    if query != " " and query != "":
+                        cp = multiprocessing.Process(target=jarvis_brain,args=(query,))
+                        cp.start()
+                        
+                except Exception as e:
+                    pass
+                    # speak("not recognize")
+
+    finally:
+        if porcupine is not None:
+            porcupine.delete()
+        if audio_stream is not None:
+            audio_stream.close()
+        if paud is not None:
+            paud.terminate()
