@@ -1,6 +1,8 @@
-import pyttsx3
+import multiprocessing
+
 
 def speakchild(text):
+    import pyttsx3
     engine=pyttsx3.init("sapi5")
     voices=engine.getProperty("voices")
     engine.setProperty("voice",voices[0].id)
@@ -9,7 +11,9 @@ def speakchild(text):
     engine.say(text)
     engine.runAndWait()
 
+
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     import struct
     import pyaudio
     import pvporcupine
@@ -20,19 +24,23 @@ if __name__ == "__main__":
     import os
     # import pyttsx3
     from dotenv import load_dotenv
-    import multiprocessing
     from IPython.display import Markdown
     import textwrap
     import markdown
     from bs4 import BeautifulSoup
     from AppOpener import open as Open,close as Close
     import webbrowser
+    from datetime import date,datetime
     load_dotenv()
     porcupine=None
     paud=None
     audio_stream=None
     cp = None
-    # GOOGLE_API_KEY = "paste your api key"
+    # engine=pyttsx3.init("sapi5")
+    # voices=engine.getProperty("voices")
+    # engine.setProperty("voice",voices[0].id)
+    # rate=engine.getProperty('rate')
+    # engine.setProperty("rate",rate-30)
     GOOGLE_API_KEY = os.environ.get("apikey")
     genai.configure(api_key=GOOGLE_API_KEY)
     def startsound():
@@ -64,8 +72,9 @@ if __name__ == "__main__":
         f = open("chose.txt", 'w')
         f.write('0')
         f.close()
-
-
+    
+    if not os.path.exists(os.path.join('outputhistory/')):
+        os.mkdir(os.path.join('outputhistory/'))
 
     def jarvis_brain(text):
         print(chat.history)
@@ -120,8 +129,18 @@ if __name__ == "__main__":
                 
         else:
             response = chat.send_message(text)
-            speak(to_text(response.text))
-
+            responsetext = to_text(response.text)
+            speak(responsetext)
+            # print("speaking...")
+            todaydate = date.today()
+            if not os.path.exists(f'outputhistory/{todaydate}'):
+                os.mkdir(f'outputhistory/{todaydate}')
+            now = datetime.now()
+            current_time = now.strftime("%H-%M-%S")
+            # print(f'{todaydate}/{current_time}.txt')
+            f = open(os.path.join(f'outputhistory/{todaydate}/',f'{current_time}.txt'),'w')
+            f.writelines(responsetext)
+            f.close()
 
     try:
        
@@ -152,6 +171,7 @@ if __name__ == "__main__":
                         jarvis_brain(query)
                         
                 except Exception as e:
+                    print(e)
                     pass
                     # speak("not recognize")
 
